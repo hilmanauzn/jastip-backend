@@ -14,8 +14,9 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 router.get('/:id', async (req: Request, res: Response) => {
+  const customerId: string = req.params.id as string;
   const customer = await prisma.customer.findUnique({
-    where: { id: req.params.id },
+    where: { id: customerId },
     include: { orders: { orderBy: { createdAt: 'desc' }, take: 10 } },
   });
   if (!customer) throw new AppError(404, 'Customer not found');
@@ -33,16 +34,18 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 router.patch('/:id', async (req: Request, res: Response) => {
+  const customerId: string = req.params.id as string;
   const data = createCustomerSchema.partial().parse(req.body);
   const customer = await prisma.customer.update({
-    where: { id: req.params.id },
+    where: { id: customerId },
     data,
   });
   res.json({ success: true, data: customer });
 });
 
 router.delete('/:id', async (req: Request, res: Response) => {
-  await prisma.customer.delete({ where: { id: req.params.id } });
+  const customerId: string = req.params.id as string;
+  await prisma.customer.delete({ where: { id: customerId } });
   res.json({ success: true, message: 'Customer deleted' });
 });
 

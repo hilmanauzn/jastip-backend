@@ -3,13 +3,43 @@ import { prisma } from '../index.js';
 import { createOrderSchema, updateOrderStatusSchema } from '../schemas/index.js';
 import { calculateOrderTotals, generateOrderNumber } from '../services/calculations.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { getQueryString } from '../utils/query.js';
+
+interface OrderItemInput {
+  id?: string;
+  menuItemId?: string;
+  restaurantId: string;
+  name: string;
+  description?: string;
+  price: number;
+  basePrice?: number;
+  quantity: number;
+  category: string;
+  includeJastip: boolean;
+  jastipFeeSpecial?: number | null;
+  selectedAddon?: string;
+  isManual: boolean;
+}
+
+interface OrderItemWithId extends OrderItemInput {
+  id: string;
+}
+
+function ensureItemId(items: OrderItemInput[]): OrderItemWithId[] {
+  return items.map((item, index) => ({
+    ...item,
+    id: item.id ?? `item-${Date.now()}-${index}`,
+  })) as OrderItemWithId[];
+}
 
 const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
-  const { status, customerId, page = '1', limit = '20' } = req.query;
-  const skip = (Number(page) - 1) * Number(limit);
-  const take = Number(limit);
+  const status: string | undefined = getQueryString(req, 'status');
+  const customerId: string | undefined = getQueryString(req, 'customerId');
+  const page = Number(getQueryString(req, 'page') ?? '1');
+  const limit = Number(getQueryString(req, 'limit') ?? '20');
+  const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
@@ -19,7 +49,7 @@ router.get('/', async (req: Request, res: Response) => {
     prisma.order.findMany({
       where,
       skip,
-      take,
+      take: limit,
       orderBy: { createdAt: 'desc' },
       include: {
         customer: true,
@@ -33,13 +63,14 @@ router.get('/', async (req: Request, res: Response) => {
   res.json({
     success: true,
     data: orders,
-    pagination: { page: Number(page), limit: take, total, totalPages: Math.ceil(total / take) },
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 });
 
 router.get('/:id', async (req: Request, res: Response) => {
+  const orderId: string = req.params.id as string;
   const order = await prisma.order.findUnique({
-    where: { id: req.params.id },
+    where: { id: orderId },
     include: {
       customer: true,
       items: true,
@@ -54,6 +85,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/preview', async (req: Request, res: Response) => {
   const { items, jastipOverrides } = req.body as {
     items: Array<{
+      id?: string;
       restaurantId: string;
       name: string;
       price: number;
@@ -61,26 +93,53 @@ router.post('/preview', async (req: Request, res: Response) => {
       includeJastip: boolean;
       jastipFeeSpecial?: number | null;
       category: string;
+      isManual?: boolean;
     }>;
     jastipOverrides?: Record<string, number>;
   };
 
-  const restaurantIds = [...new Set(items.map((i) => i.restaurantId))];
+  const itemsWithId = ensureItemId(
+    items.map((item) => ({
+      ...item,
+      isManual: item.isManual ?? false,
+      restaurantId: item.restaurantId,
+    })) as OrderItemInput[],
+  );
+
+  const restaurantIds = [...new Set(itemsWithId.map((i) => i.restaurantId))];
   const restaurants = await prisma.restaurant.findMany({
     where: { id: { in: restaurantIds } },
   });
   const restaurantMap = new Map(restaurants.map((r) => [r.id, r]));
   const overrideMap = new Map(Object.entries(jastipOverrides ?? {}));
 
-  const totals = calculateOrderTotals(items, restaurantMap, overrideMap);
+  const totals = calculateOrderTotals(itemsWithId, restaurantMap, overrideMap);
   res.json({ success: true, data: totals });
 });
 
 router.post('/', async (req: Request, res: Response) => {
   const data = createOrderSchema.parse(req.body);
+  const itemsWithId = data.items.map((item, index): {
+    id: string;
+    menuItemId?: string;
+    restaurantId: string;
+    name: string;
+    description?: string;
+    price: number;
+    basePrice?: number;
+    quantity: number;
+    category: string;
+    includeJastip: boolean;
+    jastipFeeSpecial?: number | null;
+    selectedAddon?: string;
+    isManual: boolean;
+  } => ({
+    ...item,
+    id: item.id ?? `item-${Date.now()}-${index}`,
+  }));
 
   // Get restaurant data for calculations
-  const restaurantIds = [...new Set(data.items.map((i) => i.restaurantId))];
+  const restaurantIds = [...new Set(itemsWithId.map((i) => i.restaurantId))];
   const restaurants = await prisma.restaurant.findMany({
     where: { id: { in: restaurantIds } },
   });
@@ -88,11 +147,7 @@ router.post('/', async (req: Request, res: Response) => {
   const overrideMap = new Map(Object.entries(data.jastipOverrides ?? {}));
 
   // Calculate totals
-  const totals = calculateOrderTotals(
-    data.items,
-    restaurantMap,
-    overrideMap,
-  );
+  const totals = calculateOrderTotals(itemsWithId, restaurantMap, overrideMap);
 
   // Create order with items and fees in transaction
   const order = await prisma.$transaction(async (tx) => {
@@ -122,8 +177,20 @@ router.post('/', async (req: Request, res: Response) => {
         destination: data.destination,
         notes: data.notes,
         items: {
-          create: data.items.map((item) => ({
-            ...item,
+          create: itemsWithId.map((item) => ({
+            id: item.id,
+            menuItemId: item.menuItemId,
+            restaurantId: item.restaurantId,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            basePrice: item.basePrice,
+            quantity: item.quantity,
+            category: item.category,
+            includeJastip: item.includeJastip,
+            jastipFeeSpecial: item.jastipFeeSpecial,
+            selectedAddon: item.selectedAddon,
+            isManual: item.isManual,
             subtotal: item.price * item.quantity,
           })),
         },
@@ -158,9 +225,10 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 router.patch('/:id/status', async (req: Request, res: Response) => {
+  const orderId: string = req.params.id as string;
   const { status } = updateOrderStatusSchema.parse(req.body);
   const order = await prisma.order.update({
-    where: { id: req.params.id },
+    where: { id: orderId },
     data: { status },
     include: { items: true, restaurantFees: true },
   });
@@ -168,16 +236,18 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 });
 
 router.patch('/:id/payment', async (req: Request, res: Response) => {
+  const orderId: string = req.params.id as string;
   const { paymentStatus } = req.body as { paymentStatus: string };
   const order = await prisma.order.update({
-    where: { id: req.params.id },
+    where: { id: orderId },
     data: { paymentStatus },
   });
   res.json({ success: true, data: order });
 });
 
 router.delete('/:id', async (req: Request, res: Response) => {
-  await prisma.order.delete({ where: { id: req.params.id } });
+  const orderId: string = req.params.id as string;
+  await prisma.order.delete({ where: { id: orderId } });
   res.json({ success: true, message: 'Order deleted' });
 });
 

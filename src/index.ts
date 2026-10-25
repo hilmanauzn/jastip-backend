@@ -20,8 +20,12 @@ export const prisma = new PrismaClient({
 const app = express();
 
 app.use(helmet());
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
+  : ['http://localhost:4000'];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:4000',
+  origin: corsOrigin,
   credentials: true,
 }));
 app.use(morgan('dev'));

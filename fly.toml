@@ -1,36 +1,39 @@
-app = "jastip-backend"
-primary_region = "sin"
+# fly.toml app configuration file generated for jastip-backend on 2026-10-25T06:12:16+07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'jastip-backend'
+primary_region = 'sin'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  NODE_ENV = "production"
-  PORT = "8080"
-  # DATABASE_URL will be set via fly secrets
-  # CORS_ORIGIN will be set via fly secrets
+  NODE_ENV = 'production'
+  PORT = '8080'
+
+[[mounts]]
+  source = 'data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
+  processes = ['app']
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    path = "/health"
-    timeout = "5s"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
+  memory = '256mb'
+  cpu_kind = 'shared'
   cpus = 1
-
-# Volume for SQLite (created separately: fly volumes create data --size 1 --region sin)
-[mounts]
-  source = "data"
-  destination = "/data"
+  memory_mb = 256

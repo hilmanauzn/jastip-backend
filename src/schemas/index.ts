@@ -38,7 +38,9 @@ export const createOrderSchema = z.object({
   customerId: z.string().cuid(),
   customerName: z.string().min(1).max(100),
   items: z.array(z.object({
+    id: z.string().optional(),
     menuItemId: z.string().cuid().optional(),
+    restaurantId: z.string().cuid(),
     name: z.string().min(1).max(200),
     description: z.string().optional(),
     price: z.number().int().positive(),
