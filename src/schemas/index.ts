@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const createRestaurantSchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1).max(100),
   jastipFee: z.number().int().nonnegative(),
   multiple: z.number().int().positive().default(1),
@@ -12,6 +13,7 @@ export const createRestaurantSchema = z.object({
 export const updateRestaurantSchema = createRestaurantSchema.partial();
 
 export const createMenuItemSchema = z.object({
+  id: z.string().optional(),
   restaurantId: z.string().cuid(),
   externalId: z.string().optional(),
   name: z.string().min(1).max(200),
