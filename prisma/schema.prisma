@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Restaurant {
-  id              String   @id @default(cuid())
+  id              String   @id
   name            String   @unique
   jastipFee       Int
   multiple        Int
@@ -25,7 +25,7 @@ model Restaurant {
 }
 
 model MenuItem {
-  id              String   @id @default(cuid())
+  id              String   @id
   externalId      String?  @unique
   restaurantId    String
   name            String
