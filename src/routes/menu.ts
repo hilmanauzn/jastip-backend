@@ -79,6 +79,7 @@ router.post('/', async (req: Request, res: Response) => {
   const data = createMenuItemSchema.parse(req.body);
   const createData: Parameters<typeof prisma.menuItem.create>[0]['data'] = {
     ...data,
+    id: data.id ?? `menu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     addons: JSON.stringify(data.addons ?? []),
   };
   const item = await prisma.menuItem.create({ data: createData });
@@ -135,6 +136,7 @@ router.post('/bulk', async (req: Request, res: Response) => {
     sortOrder?: number;
   }> };
   const data = items.map((item) => ({
+    id: item.id ?? `menu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     restaurantId: item.restaurantId,
     externalId: item.externalId,
     name: item.name,

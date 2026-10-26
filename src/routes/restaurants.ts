@@ -52,7 +52,12 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   const data = createRestaurantSchema.parse(req.body);
-  const restaurant = await prisma.restaurant.create({ data });
+  const restaurant = await prisma.restaurant.create({
+    data: {
+      ...data,
+      id: data.id ?? `rest-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    },
+  });
   res.status(201).json({ success: true, data: restaurant });
 });
 
