@@ -44,6 +44,7 @@ async function migrate() {
         isActive: rest.available,
       },
       create: {
+        id: rest.id,
         name: rest.name,
         jastipFee: rest.jastipFee,
         multiple: rest.multiple,
@@ -89,6 +90,7 @@ async function migrate() {
           isAvailable: item.available,
         },
         create: {
+          id: item.id,
           externalId: item.id,
           restaurantId,
           name: item.name,
