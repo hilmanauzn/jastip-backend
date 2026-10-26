@@ -122,6 +122,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // Bulk import (for initial migration)
 router.post('/bulk', async (req: Request, res: Response) => {
   const { items } = req.body as { items: Array<{
+    id?: string;
     restaurantId: string;
     externalId?: string;
     name: string;
